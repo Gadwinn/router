@@ -131,6 +131,21 @@ $router->group('/admin', function (Router $r): void {
 
 ---
 
+### Base path
+
+When the application is not served at the web root (e.g. `http://localhost/apps/shop/public/`), declare the base path once instead of wrapping every route in a group:
+
+```php
+$router->setBasePath('/apps/shop/public');
+
+$router->get('/users/{id:i}', 'user', ['name' => 'user']);
+
+// Matches the request path /apps/shop/public/users/42
+// $router->url('user', ['id' => 42]) returns '/apps/shop/public/users/42'
+```
+
+The base path is removed from the request path before matching (a request outside of it is a 404) and prepended to generated URLs. Route paths, `getRoutes()` and `unmap()` are not affected.
+
 ### Removing routes
 
 ```php

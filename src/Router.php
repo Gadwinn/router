@@ -24,6 +24,11 @@ class Router extends AbstractRouter
 
     protected string $prefixPath = '';
 
+    /**
+     * Path the application is served under (no trailing slash), '' at the web root.
+     */
+    protected string $basePath = '';
+
     protected string $prefixName = '';
 
     /**
@@ -64,6 +69,7 @@ class Router extends AbstractRouter
     protected const string REGEX_NAME = '/^[\w\'`#$%&*+.^|~!-]+$/';
     protected const string REGEX_UNESCAPED_DELIMITER = '/(?<!\\\\)((?:\\\\\\\\)*)#/';
     protected const string DEFAULT_PATTERN = '*';
+    protected const string ROOT_PATH = '/';
     protected const string METHOD_GET = 'GET';
     protected const string METHOD_HEAD = 'HEAD';
 
@@ -100,6 +106,21 @@ class Router extends AbstractRouter
         }
 
         $this->allowedMethods[] = $method;
+
+        return $this;
+    }
+
+    #[\Override]
+    public function getBasePath(): string
+    {
+        return $this->basePath;
+    }
+
+    #[\Override]
+    public function setBasePath(string $basePath): static
+    {
+        $basePath = trim($basePath, '/');
+        $this->basePath = $basePath !== '' ? '/' . $basePath : '';
 
         return $this;
     }
@@ -143,13 +164,18 @@ class Router extends AbstractRouter
             throw new MethodNotAllowedException('Method not allowed', 405, $this->allowedMethods);
         }
 
+        $requestPath = $this->stripBasePath($request->getUri()->getPath());
+        if ($requestPath === null) {
+            throw new NotFoundException('Route not found', 404);
+        }
+
         $matchedRoute = null;
         $matchedParams = [];
         /** @var array<string> $pathAllowedMethods Methods allowed for the matched path (for 405 Allow header) */
         $pathAllowedMethods = [];
 
         foreach ($this->routes as $route) {
-            if (!preg_match('#^' . $route->getPath() . '$#D', $request->getUri()->getPath(), $matches)) {
+            if (!preg_match('#^' . $route->getPath() . '$#D', $requestPath, $matches)) {
                 continue;
             }
 
@@ -222,7 +248,7 @@ class Router extends AbstractRouter
             throw new RouterException('Route (' . $name . ') not found');
         }
 
-        $path = '';
+        $path = $this->basePath;
         $offset = 0;
         $template = $this->templates[$hash];
 
@@ -372,6 +398,24 @@ class Router extends AbstractRouter
         }
 
         return $regex . preg_quote(substr($path, $offset), '#');
+    }
+
+    /**
+     * Removes the base path from a request path.
+     *
+     * @return ?string Null when the path is outside the base path
+     */
+    protected function stripBasePath(string $path): ?string
+    {
+        if ($this->basePath === '') {
+            return $path;
+        }
+
+        if ($path === $this->basePath) {
+            return self::ROOT_PATH;
+        }
+
+        return str_starts_with($path, $this->basePath . '/') ? substr($path, strlen($this->basePath)) : null;
     }
 
     /**
