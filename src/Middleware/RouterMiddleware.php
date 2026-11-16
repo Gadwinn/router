@@ -11,7 +11,8 @@ use Psr\Http\Server\{MiddlewareInterface, RequestHandlerInterface};
 
 class RouterMiddleware implements MiddlewareInterface
 {
-    protected const string ROUTE_ATTRIBUTE_NAME = 'route';
+    /** Name of the request attribute receiving the matched route */
+    public const string ROUTE_ATTRIBUTE_NAME = 'route';
 
     /**
      * @param RouterInterface $router

@@ -177,7 +177,7 @@ Retrieve the matched route inside any downstream middleware or handler:
 ```php
 use G\Router\Route\RouteInterface;
 
-$route = $request->getAttribute('route'); // RouteInterface
+$route = $request->getAttribute(RouterMiddleware::ROUTE_ATTRIBUTE_NAME); // 'route', a RouteInterface
 $route->getTarget();
 $route->getParams();
 $route->getMethod();
