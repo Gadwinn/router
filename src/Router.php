@@ -205,45 +205,57 @@ class Router extends AbstractRouter
     }
 
     /**
+     * Parameters that are not part of the path are appended as a query string.
+     *
      * @param ?string $name
-     * @param array<string,string> $params
+     * @param array<string,mixed> $params
      *
      * @return string
+     *
+     * @throws RouterException When the route is unknown, or a path parameter is missing or invalid
      */
     #[\Override]
     public function url(?string $name, array $params = []): string
     {
         $hash = $name !== null ? $this->findHashByName($name) : null;
         if ($hash === null) {
-            return '';
+            throw new RouterException('Route (' . $name . ') not found');
         }
 
-        $error = false;
+        $path = '';
+        $offset = 0;
+        $template = $this->templates[$hash];
 
-        $path = preg_replace_callback(
-            self::REGEX_PARAM,
-            function (array $matches) use (&$params, &$error): string {
-                $value = (string) ($params[$matches[1]] ?? '');
-                $pattern = $this->escapeDelimiter($this->resolvePattern($matches[2] ?? ''));
+        preg_match_all(self::REGEX_PARAM, $template, $placeholders, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
 
-                if ($value === '' || !preg_match('#^(?:' . $pattern . ')$#D', $value)) {
-                    $error = true;
-                    return '';
-                }
+        foreach ($placeholders as $placeholder) {
+            [$text, $position] = $placeholder[0];
+            $param = $placeholder[1][0];
+            $value = $params[$param] ?? '';
+            $value = is_scalar($value) || $value instanceof \Stringable ? (string) $value : '';
 
-                unset($params[$matches[1]]);
+            if ($value === '') {
+                throw new RouterException('Route (' . $name . '): parameter (' . $param . ') is missing');
+            }
 
-                // Slashes are kept so that a trailing parameter ({rest:**}) stays a path.
-                return implode('/', array_map('rawurlencode', explode('/', $value)));
-            },
-            $this->templates[$hash]
-        );
+            $pattern = $this->escapeDelimiter($this->resolvePattern($placeholder[2][0] ?? ''));
+            if (!preg_match('#^(?:' . $pattern . ')$#D', $value)) {
+                throw new RouterException(
+                    'Route (' . $name . '): parameter (' . $param . ') does not accept the value (' . $value . ')'
+                );
+            }
 
-        if ($error || $path === null || $params !== []) {
-            return '';
+            // Slashes are kept so that a trailing parameter ({rest:**}) stays a path.
+            $path .= substr($template, $offset, $position - $offset)
+                . implode('/', array_map('rawurlencode', explode('/', $value)));
+            $offset = $position + strlen($text);
+            unset($params[$param]);
         }
 
-        return $path;
+        $path .= substr($template, $offset);
+        $query = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+
+        return $query !== '' ? $path . '?' . $query : $path;
     }
 
     #[\Override]
