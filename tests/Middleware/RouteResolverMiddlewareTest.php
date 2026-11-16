@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace G\Router\Tests\Middlewares;
+namespace G\Router\Tests\Middleware;
 
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use G\Router\Tests\UtilsTrait;
-use G\Router\Middlewares\RouteResolverMiddleware;
-use G\Router\Routes\{Route, RouteInterface};
-use G\Router\Exceptions\NotFoundException;
+use G\Router\Middleware\RouteResolverMiddleware;
+use G\Router\Route\{Route, RouteInterface};
+use G\Router\Exception\NotFoundException;
 
 /**
  * Tests for RouteResolverMiddleware.

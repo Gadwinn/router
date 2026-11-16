@@ -43,7 +43,7 @@ $router->any('/ping', fn() => 'pong'); // all registered HTTP methods
 Dispatch against a PSR-7 `RequestInterface`:
 
 ```php
-use G\Router\Exceptions\{NotFoundException, MethodNotAllowedException};
+use G\Router\Exception\{NotFoundException, MethodNotAllowedException};
 
 try {
     $route = $router->match($request);
@@ -164,7 +164,7 @@ $router->unmapByName('user.profile');
 Drop both middlewares into any PSR-15 pipeline. `RouterMiddleware` resolves the route and stores it as the `route` request attribute; `RouteResolverMiddleware` guards the downstream pipeline against a missing attribute.
 
 ```php
-use G\Router\Middlewares\{RouterMiddleware, RouteResolverMiddleware};
+use G\Router\Middleware\{RouterMiddleware, RouteResolverMiddleware};
 
 // Framework-agnostic example (e.g. with league/pipeline or any PSR-15 dispatcher)
 $pipeline->pipe(new RouterMiddleware($router));
@@ -175,7 +175,7 @@ $pipeline->pipe(new YourDispatcherMiddleware());
 Retrieve the matched route inside any downstream middleware or handler:
 
 ```php
-use G\Router\Routes\RouteInterface;
+use G\Router\Route\RouteInterface;
 
 $route = $request->getAttribute('route'); // RouteInterface
 $route->getTarget();
@@ -192,7 +192,7 @@ Any class implementing `RouteInterface` can be substituted:
 
 ```php
 use G\Router\Router;
-use G\Router\Routes\RouteInterface;
+use G\Router\Route\RouteInterface;
 
 class AnnotatedRoute implements RouteInterface
 {

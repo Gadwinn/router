@@ -7,8 +7,8 @@ namespace G\Router\Tests;
 use PHPUnit\Framework\TestCase;
 use G\Router\Tests\UtilsTrait;
 use G\Router\{Router, RouterInterface};
-use G\Router\Exceptions\{MethodNotAllowedException, NotFoundException, RouterException};
-use G\Router\Routes\{Route, RouteInterface};
+use G\Router\Exception\{MethodNotAllowedException, NotFoundException, RouterException};
+use G\Router\Route\{Route, RouteInterface};
 
 final class RouterTest extends TestCase
 {

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace G\Router\Middlewares;
+namespace G\Router\Middleware;
 
-use G\Router\Exceptions\RouterException;
+use G\Router\Exception\RouterException;
 use G\Router\RouterInterface;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\{MiddlewareInterface, RequestHandlerInterface};
