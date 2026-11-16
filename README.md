@@ -131,6 +131,45 @@ $router->group('/admin', function (Router $r): void {
 
 ---
 
+### Attributes
+
+Routes can be declared on the controllers instead of being mapped one by one: `#[Group]` on the class (optional) is the group, `#[Route]` on a method is a route of that group.
+
+```php
+use G\Router\Attribute\{Group, Route};
+
+#[Group('/users', name: 'users.')]
+final class UserController
+{
+    #[Route('', name: 'index')]                       // GET /users            users.index
+    public function index() { /* ... */ }
+
+    #[Route('/{id:i}', name: 'show')]                 // GET /users/{id}       users.show
+    public function show(int $id) { /* ... */ }
+
+    #[Route('/{id:i}', methods: ['PUT', 'PATCH'])]    // PUT, PATCH /users/{id}
+    public function update(int $id) { /* ... */ }
+}
+```
+
+```php
+use G\Router\Attribute\AttributeLoader;
+
+$loader = new AttributeLoader($router);
+
+$loader->loadDirectory(__DIR__ . '/src/Controller', 'App\Controller'); // every class, sub-directories included
+$loader->loadClass(UserController::class, HomeController::class);      // or chosen classes
+```
+
+- `#[Group(path, name, options)]` behaves like `group()`: path prefix, name prefix.
+- `#[Route(path, methods, name, options)]`: `methods` defaults to `GET`; the attribute is repeatable; the target of the route is `[Controller::class, 'method']`.
+- A class without `#[Group]` maps its routes as they are. A `#[Route]` on a method that is not a public instance method throws a `RouterException`.
+- `loadDirectory()` expects a PSR-4 layout and ignores abstract classes and files that do not hold a class.
+
+Attributes and `map()` calls can be mixed. The directory is read each time `loadDirectory()` is called.
+
+---
+
 ### Base path
 
 When the application is not served at the web root (e.g. `http://localhost/apps/shop/public/`), declare the base path once instead of wrapping every route in a group:
