@@ -31,6 +31,25 @@ interface RouterInterface
     public function addAllowedMethod(string $method): static;
 
     /**
+     * Get the base path
+     *
+     * @return string '' when the application is served at the web root
+     */
+    public function getBasePath(): string;
+
+    /**
+     * Set the base path
+     *
+     * Path the application is served under (e.g. '/shop' or '/apps/shop/public').
+     * It is removed from the request path before matching and prepended to generated URLs.
+     *
+     * @param string $basePath
+     *
+     * @return static
+     */
+    public function setBasePath(string $basePath): static;
+
+    /**
      * @return array<string,string> Returns a mapping of pattern aliases to their respective regex patterns.
      */
     public function getPatterns(): array;

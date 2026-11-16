@@ -560,4 +560,51 @@ final class RouterTest extends TestCase
 
         $this->assertCount(0, $this->router->getRoutes());
     }
+
+    // -------------------------------------------------------------------------
+    // Base path
+    // -------------------------------------------------------------------------
+
+    public function testBasePathIsNormalized(): void
+    {
+        $this->assertSame('', $this->router->getBasePath());
+        $this->assertSame('/shop', $this->router->setBasePath('shop/')->getBasePath());
+        $this->assertSame('/apps/shop', $this->router->setBasePath('/apps/shop')->getBasePath());
+        $this->assertSame('', $this->router->setBasePath('/')->getBasePath());
+    }
+
+    public function testMatchRemovesTheBasePath(): void
+    {
+        $this->router->setBasePath('/shop');
+        $this->router->get('/', 'home');
+        $this->router->get('/users/{id:i}', 'user');
+
+        $this->assertSame('user', $this->router->match($this->requestGenerator('GET', '/shop/users/42'))->getTarget());
+        $this->assertSame(['id' => '42'], $this->router->match($this->requestGenerator('GET', '/shop/users/42'))->getParams());
+        $this->assertSame('home', $this->router->match($this->requestGenerator('GET', '/shop/'))->getTarget());
+        $this->assertSame('home', $this->router->match($this->requestGenerator('GET', '/shop'))->getTarget());
+    }
+
+    public function testMatchOutsideTheBasePathIsNotFound(): void
+    {
+        $this->router->setBasePath('/shop');
+        $this->router->get('/users', 'users');
+
+        foreach (['/users', '/shopping/users', '/other/users'] as $path) {
+            try {
+                $this->router->match($this->requestGenerator('GET', $path));
+                $this->fail('Expected a NotFoundException for ' . $path);
+            } catch (NotFoundException $e) {
+                $this->assertSame(404, $e->getCode());
+            }
+        }
+    }
+
+    public function testUrlIncludesTheBasePath(): void
+    {
+        $this->router->setBasePath('/shop');
+        $this->router->get('/users/{id:i}', 'user', ['name' => 'user']);
+
+        $this->assertSame('/shop/users/42?tab=posts', $this->router->url('user', ['id' => 42, 'tab' => 'posts']));
+    }
 }
