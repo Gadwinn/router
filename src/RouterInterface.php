@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace G\Router;
 
 use Psr\Http\Message\RequestInterface;
-use G\Router\Routes\RouteInterface;
-use G\Router\Exceptions\{MethodNotAllowedException, NotFoundException, RouterException};
+use G\Router\Route\RouteInterface;
+use G\Router\Exception\{MethodNotAllowedException, NotFoundException, RouterException};
 
 interface RouterInterface
 {

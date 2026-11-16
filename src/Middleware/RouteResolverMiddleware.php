@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace G\Router\Middlewares;
+namespace G\Router\Middleware;
 
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\{MiddlewareInterface, RequestHandlerInterface};
-use G\Router\Routes\RouteInterface;
-use G\Router\Exceptions\NotFoundException;
+use G\Router\Route\RouteInterface;
+use G\Router\Exception\NotFoundException;
 
 class RouteResolverMiddleware implements MiddlewareInterface
 {

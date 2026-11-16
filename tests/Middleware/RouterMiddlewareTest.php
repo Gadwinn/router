@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace G\Router\Tests\Middlewares;
+namespace G\Router\Tests\Middleware;
 
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\{ServerRequestInterface, UriInterface};
 use Psr\Http\Server\RequestHandlerInterface;
 use G\Router\Tests\UtilsTrait;
-use G\Router\Middlewares\RouterMiddleware;
+use G\Router\Middleware\RouterMiddleware;
 use G\Router\Router;
-use G\Router\Routes\RouteInterface;
-use G\Router\Exceptions\{MethodNotAllowedException, NotFoundException, RouterException};
+use G\Router\Route\RouteInterface;
+use G\Router\Exception\{MethodNotAllowedException, NotFoundException, RouterException};
 use Psr\Http\Message\ResponseInterface;
 
 /**

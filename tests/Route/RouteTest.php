@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace G\Router\Tests\Routes;
+namespace G\Router\Tests\Route;
 
 use PHPUnit\Framework\TestCase;
 use G\Router\Tests\UtilsTrait;
-use G\Router\Routes\Route;
+use G\Router\Route\Route;
 
 final class RouteTest extends TestCase
 {
