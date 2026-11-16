@@ -279,20 +279,48 @@ final class RouterTest extends TestCase
 
     public function testUrlNameNull(): void
     {
-        $this->assertEmpty($this->router->url(null));
+        $this->expectException(RouterException::class);
+        $this->expectExceptionMessage('Route () not found');
+
+        $this->router->url(null);
     }
 
     public function testUrlNotFound(): void
     {
-        $this->assertEmpty($this->router->url('target'));
+        $this->expectException(RouterException::class);
+        $this->expectExceptionMessage('Route (target) not found');
+
+        $this->router->url('target');
     }
 
-    public function testUrlInvalidParams(): void
+    public function testUrlInvalidParam(): void
     {
         $this->router->map('GET', '/target/{id:i}/{slug:s}', 'target', ['name' => 'target']);
-        $this->assertEmpty($this->router->url('target', ['id' => 'id', 'slug' => 'slug']));
-        $this->assertEmpty($this->router->url('target', ['id' => 1]));
-        $this->assertEmpty($this->router->url('target', ['id' => 1, 'slug' => 'slug', 'custom' => 'custom']));
+
+        $this->expectException(RouterException::class);
+        $this->expectExceptionMessage('Route (target): parameter (id) does not accept the value (abc)');
+
+        $this->router->url('target', ['id' => 'abc', 'slug' => 'slug']);
+    }
+
+    public function testUrlMissingParam(): void
+    {
+        $this->router->map('GET', '/target/{id:i}/{slug:s}', 'target', ['name' => 'target']);
+
+        $this->expectException(RouterException::class);
+        $this->expectExceptionMessage('Route (target): parameter (slug) is missing');
+
+        $this->router->url('target', ['id' => 1]);
+    }
+
+    public function testUrlAppendsExtraParamsAsQueryString(): void
+    {
+        $this->router->map('GET', '/target/{id:i}', 'target', ['name' => 'target']);
+        $this->router->map('GET', '/list', 'target', ['name' => 'list']);
+
+        $this->assertSame('/target/1?page=2&q=a%20b%26c', $this->router->url('target', ['id' => 1, 'page' => 2, 'q' => 'a b&c']));
+        $this->assertSame('/list?tags%5B0%5D=x&tags%5B1%5D=y', $this->router->url('list', ['tags' => ['x', 'y']]));
+        $this->assertSame('/list', $this->router->url('list', ['page' => null]));
     }
 
     // -------------------------------------------------------------------------
@@ -474,8 +502,15 @@ final class RouterTest extends TestCase
         $this->router->get('/export.{format:(json|xml)}', 'target', ['name' => 'export']);
 
         $this->assertSame('/export.json', $this->router->url('export', ['format' => 'json']));
-        $this->assertSame('', $this->router->url('export', ['format' => 'jsonx']));
-        $this->assertSame('', $this->router->url('export', ['format' => 'csv']));
+
+        foreach (['jsonx', 'csv'] as $format) {
+            try {
+                $this->router->url('export', ['format' => $format]);
+                $this->fail('Expected a RouterException for ' . $format);
+            } catch (RouterException $e) {
+                $this->assertStringContainsString('(format)', $e->getMessage());
+            }
+        }
     }
 
     public function testUrlInsideAGroup(): void
@@ -492,7 +527,9 @@ final class RouterTest extends TestCase
         $this->router->get('/users', 'target', ['name' => 'users']);
         $this->router->unmap('GET', '/users');
 
-        $this->assertSame('', $this->router->url('users'));
+        $this->expectException(RouterException::class);
+
+        $this->router->url('users');
     }
 
     // -------------------------------------------------------------------------

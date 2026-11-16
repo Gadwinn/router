@@ -95,11 +95,11 @@ $router->get('/orders/{id:uuid}', [OrderController::class, 'show']);
 ```php
 $router->get('/users/{id:i}/profile', [UserController::class, 'profile'], ['name' => 'user.profile']);
 
-// Reverse generation — returns '' on failure (unknown name or invalid params)
+// Reverse generation
 $url = $router->url('user.profile', ['id' => '42']); // '/users/42/profile'
 ```
 
-Each value must match the pattern of its parameter and is URL-encoded (`'a b'` → `a%20b`); slashes are kept for a trailing parameter (`{rest:**}`). A parameter that does not exist in the path makes the generation fail. When several routes share a name, the first one mapped is used.
+Each value must match the pattern of its parameter and is URL-encoded (`'a b'` → `a%20b`); slashes are kept for a trailing parameter (`{rest:**}`). Parameters that are not part of the path are appended as a query string (`url('user.profile', ['id' => '42', 'tab' => 'posts'])` → `/users/42/profile?tab=posts`). A `RouterException` is thrown when the route name is unknown or when a path parameter is missing or does not match its pattern. When several routes share a name, the first one mapped is used.
 
 ---
 

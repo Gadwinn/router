@@ -75,12 +75,15 @@ interface RouterInterface
     /**
      * Generate a URL
      *
-     * Generates a URL with an optional route name and parameters.
+     * Generates the URL of a named route. Parameters that are not part of the
+     * path are appended as a query string.
      *
      * @param ?string $name
-     * @param array<string,string> $params
+     * @param array<string,mixed> $params
      *
      * @return string
+     *
+     * @throws RouterException When the route is unknown, or a path parameter is missing or invalid
      */
     public function url(?string $name, array $params = []): string;
 
