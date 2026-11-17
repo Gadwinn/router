@@ -261,3 +261,7 @@ $router->getPatterns();       // array<string, string>
 $router->getRoutes();         // array<string, RouteInterface>
 $router->matchByName('user.profile'); // ?RouteInterface
 ```
+
+## License
+
+MIT, see [LICENSE](LICENSE).
