@@ -43,7 +43,7 @@ $router->any('/ping', fn() => 'pong'); // all registered HTTP methods
 Dispatch against a PSR-7 `RequestInterface`:
 
 ```php
-use G\Router\Exceptions\{NotFoundException, MethodNotAllowedException};
+use G\Router\Exception\{NotFoundException, MethodNotAllowedException};
 
 try {
     $route = $router->match($request);
@@ -95,11 +95,11 @@ $router->get('/orders/{id:uuid}', [OrderController::class, 'show']);
 ```php
 $router->get('/users/{id:i}/profile', [UserController::class, 'profile'], ['name' => 'user.profile']);
 
-// Reverse generation — returns '' on failure (unknown name or invalid params)
+// Reverse generation
 $url = $router->url('user.profile', ['id' => '42']); // '/users/42/profile'
 ```
 
-Each value must match the pattern of its parameter and is URL-encoded (`'a b'` → `a%20b`); slashes are kept for a trailing parameter (`{rest:**}`). A parameter that does not exist in the path makes the generation fail. When several routes share a name, the first one mapped is used.
+Each value must match the pattern of its parameter and is URL-encoded (`'a b'` → `a%20b`); slashes are kept for a trailing parameter (`{rest:**}`). Parameters that are not part of the path are appended as a query string (`url('user.profile', ['id' => '42', 'tab' => 'posts'])` → `/users/42/profile?tab=posts`). A `RouterException` is thrown when the route name is unknown or when a path parameter is missing or does not match its pattern. When several routes share a name, the first one mapped is used.
 
 ---
 
@@ -131,6 +131,60 @@ $router->group('/admin', function (Router $r): void {
 
 ---
 
+### Attributes
+
+Routes can be declared on the controllers instead of being mapped one by one: `#[Group]` on the class (optional) is the group, `#[Route]` on a method is a route of that group.
+
+```php
+use G\Router\Attribute\{Group, Route};
+
+#[Group('/users', name: 'users.')]
+final class UserController
+{
+    #[Route('', name: 'index')]                       // GET /users            users.index
+    public function index() { /* ... */ }
+
+    #[Route('/{id:i}', name: 'show')]                 // GET /users/{id}       users.show
+    public function show(int $id) { /* ... */ }
+
+    #[Route('/{id:i}', methods: ['PUT', 'PATCH'])]    // PUT, PATCH /users/{id}
+    public function update(int $id) { /* ... */ }
+}
+```
+
+```php
+use G\Router\Attribute\AttributeLoader;
+
+$loader = new AttributeLoader($router);
+
+$loader->loadDirectory(__DIR__ . '/src/Controller', 'App\Controller'); // every class, sub-directories included
+$loader->loadClass(UserController::class, HomeController::class);      // or chosen classes
+```
+
+- `#[Group(path, name, options)]` behaves like `group()`: path prefix, name prefix.
+- `#[Route(path, methods, name, options)]`: `methods` defaults to `GET`; the attribute is repeatable; the target of the route is `[Controller::class, 'method']`.
+- A class without `#[Group]` maps its routes as they are. A `#[Route]` on a method that is not a public instance method throws a `RouterException`.
+- `loadDirectory()` expects a PSR-4 layout and ignores abstract classes and files that do not hold a class.
+
+Attributes and `map()` calls can be mixed. The directory is read each time `loadDirectory()` is called.
+
+---
+
+### Base path
+
+When the application is not served at the web root (e.g. `http://localhost/apps/shop/public/`), declare the base path once instead of wrapping every route in a group:
+
+```php
+$router->setBasePath('/apps/shop/public');
+
+$router->get('/users/{id:i}', 'user', ['name' => 'user']);
+
+// Matches the request path /apps/shop/public/users/42
+// $router->url('user', ['id' => 42]) returns '/apps/shop/public/users/42'
+```
+
+The base path is removed from the request path before matching (a request outside of it is a 404) and prepended to generated URLs. Route paths, `getRoutes()` and `unmap()` are not affected.
+
 ### Removing routes
 
 ```php
@@ -149,7 +203,7 @@ $router->unmapByName('user.profile');
 Drop both middlewares into any PSR-15 pipeline. `RouterMiddleware` resolves the route and stores it as the `route` request attribute; `RouteResolverMiddleware` guards the downstream pipeline against a missing attribute.
 
 ```php
-use G\Router\Middlewares\{RouterMiddleware, RouteResolverMiddleware};
+use G\Router\Middleware\{RouterMiddleware, RouteResolverMiddleware};
 
 // Framework-agnostic example (e.g. with league/pipeline or any PSR-15 dispatcher)
 $pipeline->pipe(new RouterMiddleware($router));
@@ -160,9 +214,9 @@ $pipeline->pipe(new YourDispatcherMiddleware());
 Retrieve the matched route inside any downstream middleware or handler:
 
 ```php
-use G\Router\Routes\RouteInterface;
+use G\Router\Route\RouteInterface;
 
-$route = $request->getAttribute('route'); // RouteInterface
+$route = $request->getAttribute(RouterMiddleware::ROUTE_ATTRIBUTE_NAME); // 'route', a RouteInterface
 $route->getTarget();
 $route->getParams();
 $route->getMethod();
@@ -177,7 +231,7 @@ Any class implementing `RouteInterface` can be substituted:
 
 ```php
 use G\Router\Router;
-use G\Router\Routes\RouteInterface;
+use G\Router\Route\RouteInterface;
 
 class AnnotatedRoute implements RouteInterface
 {
@@ -207,3 +261,7 @@ $router->getPatterns();       // array<string, string>
 $router->getRoutes();         // array<string, RouteInterface>
 $router->matchByName('user.profile'); // ?RouteInterface
 ```
+
+## License
+
+MIT, see [LICENSE](LICENSE).

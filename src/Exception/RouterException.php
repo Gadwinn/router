@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace G\Router\Exceptions;
+namespace G\Router\Exception;
 
 use Exception;
 

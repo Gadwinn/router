@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace G\Router;
 
 use Psr\Http\Message\RequestInterface;
-use G\Router\Routes\{Route, RouteInterface};
-use G\Router\Exceptions\{MethodNotAllowedException, NotFoundException, RouterException};
+use G\Router\Route\{Route, RouteInterface};
+use G\Router\Exception\{MethodNotAllowedException, NotFoundException, RouterException};
 
 class Router extends AbstractRouter
 {
@@ -23,6 +23,11 @@ class Router extends AbstractRouter
     protected array $templates = [];
 
     protected string $prefixPath = '';
+
+    /**
+     * Path the application is served under (no trailing slash), '' at the web root.
+     */
+    protected string $basePath = '';
 
     protected string $prefixName = '';
 
@@ -64,6 +69,7 @@ class Router extends AbstractRouter
     protected const string REGEX_NAME = '/^[\w\'`#$%&*+.^|~!-]+$/';
     protected const string REGEX_UNESCAPED_DELIMITER = '/(?<!\\\\)((?:\\\\\\\\)*)#/';
     protected const string DEFAULT_PATTERN = '*';
+    protected const string ROOT_PATH = '/';
     protected const string METHOD_GET = 'GET';
     protected const string METHOD_HEAD = 'HEAD';
 
@@ -100,6 +106,21 @@ class Router extends AbstractRouter
         }
 
         $this->allowedMethods[] = $method;
+
+        return $this;
+    }
+
+    #[\Override]
+    public function getBasePath(): string
+    {
+        return $this->basePath;
+    }
+
+    #[\Override]
+    public function setBasePath(string $basePath): static
+    {
+        $basePath = trim($basePath, '/');
+        $this->basePath = $basePath !== '' ? '/' . $basePath : '';
 
         return $this;
     }
@@ -143,13 +164,18 @@ class Router extends AbstractRouter
             throw new MethodNotAllowedException('Method not allowed', 405, $this->allowedMethods);
         }
 
+        $requestPath = $this->stripBasePath($request->getUri()->getPath());
+        if ($requestPath === null) {
+            throw new NotFoundException('Route not found', 404);
+        }
+
         $matchedRoute = null;
         $matchedParams = [];
         /** @var array<string> $pathAllowedMethods Methods allowed for the matched path (for 405 Allow header) */
         $pathAllowedMethods = [];
 
         foreach ($this->routes as $route) {
-            if (!preg_match('#^' . $route->getPath() . '$#D', $request->getUri()->getPath(), $matches)) {
+            if (!preg_match('#^' . $route->getPath() . '$#D', $requestPath, $matches)) {
                 continue;
             }
 
@@ -205,45 +231,57 @@ class Router extends AbstractRouter
     }
 
     /**
+     * Parameters that are not part of the path are appended as a query string.
+     *
      * @param ?string $name
-     * @param array<string,string> $params
+     * @param array<string,mixed> $params
      *
      * @return string
+     *
+     * @throws RouterException When the route is unknown, or a path parameter is missing or invalid
      */
     #[\Override]
     public function url(?string $name, array $params = []): string
     {
         $hash = $name !== null ? $this->findHashByName($name) : null;
         if ($hash === null) {
-            return '';
+            throw new RouterException('Route (' . $name . ') not found');
         }
 
-        $error = false;
+        $path = $this->basePath;
+        $offset = 0;
+        $template = $this->templates[$hash];
 
-        $path = preg_replace_callback(
-            self::REGEX_PARAM,
-            function (array $matches) use (&$params, &$error): string {
-                $value = (string) ($params[$matches[1]] ?? '');
-                $pattern = $this->escapeDelimiter($this->resolvePattern($matches[2] ?? ''));
+        preg_match_all(self::REGEX_PARAM, $template, $placeholders, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
 
-                if ($value === '' || !preg_match('#^(?:' . $pattern . ')$#D', $value)) {
-                    $error = true;
-                    return '';
-                }
+        foreach ($placeholders as $placeholder) {
+            [$text, $position] = $placeholder[0];
+            $param = $placeholder[1][0];
+            $value = $params[$param] ?? '';
+            $value = is_scalar($value) || $value instanceof \Stringable ? (string) $value : '';
 
-                unset($params[$matches[1]]);
+            if ($value === '') {
+                throw new RouterException('Route (' . $name . '): parameter (' . $param . ') is missing');
+            }
 
-                // Slashes are kept so that a trailing parameter ({rest:**}) stays a path.
-                return implode('/', array_map('rawurlencode', explode('/', $value)));
-            },
-            $this->templates[$hash]
-        );
+            $pattern = $this->escapeDelimiter($this->resolvePattern($placeholder[2][0] ?? ''));
+            if (!preg_match('#^(?:' . $pattern . ')$#D', $value)) {
+                throw new RouterException(
+                    'Route (' . $name . '): parameter (' . $param . ') does not accept the value (' . $value . ')'
+                );
+            }
 
-        if ($error || $path === null || $params !== []) {
-            return '';
+            // Slashes are kept so that a trailing parameter ({rest:**}) stays a path.
+            $path .= substr($template, $offset, $position - $offset)
+                . implode('/', array_map('rawurlencode', explode('/', $value)));
+            $offset = $position + strlen($text);
+            unset($params[$param]);
         }
 
-        return $path;
+        $path .= substr($template, $offset);
+        $query = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+
+        return $query !== '' ? $path . '?' . $query : $path;
     }
 
     #[\Override]
@@ -360,6 +398,24 @@ class Router extends AbstractRouter
         }
 
         return $regex . preg_quote(substr($path, $offset), '#');
+    }
+
+    /**
+     * Removes the base path from a request path.
+     *
+     * @return ?string Null when the path is outside the base path
+     */
+    protected function stripBasePath(string $path): ?string
+    {
+        if ($this->basePath === '') {
+            return $path;
+        }
+
+        if ($path === $this->basePath) {
+            return self::ROOT_PATH;
+        }
+
+        return str_starts_with($path, $this->basePath . '/') ? substr($path, strlen($this->basePath)) : null;
     }
 
     /**

@@ -7,8 +7,8 @@ namespace G\Router\Tests;
 use PHPUnit\Framework\TestCase;
 use G\Router\Tests\UtilsTrait;
 use G\Router\{Router, RouterInterface};
-use G\Router\Exceptions\{MethodNotAllowedException, NotFoundException, RouterException};
-use G\Router\Routes\{Route, RouteInterface};
+use G\Router\Exception\{MethodNotAllowedException, NotFoundException, RouterException};
+use G\Router\Route\{Route, RouteInterface};
 
 final class RouterTest extends TestCase
 {
@@ -279,20 +279,48 @@ final class RouterTest extends TestCase
 
     public function testUrlNameNull(): void
     {
-        $this->assertEmpty($this->router->url(null));
+        $this->expectException(RouterException::class);
+        $this->expectExceptionMessage('Route () not found');
+
+        $this->router->url(null);
     }
 
     public function testUrlNotFound(): void
     {
-        $this->assertEmpty($this->router->url('target'));
+        $this->expectException(RouterException::class);
+        $this->expectExceptionMessage('Route (target) not found');
+
+        $this->router->url('target');
     }
 
-    public function testUrlInvalidParams(): void
+    public function testUrlInvalidParam(): void
     {
         $this->router->map('GET', '/target/{id:i}/{slug:s}', 'target', ['name' => 'target']);
-        $this->assertEmpty($this->router->url('target', ['id' => 'id', 'slug' => 'slug']));
-        $this->assertEmpty($this->router->url('target', ['id' => 1]));
-        $this->assertEmpty($this->router->url('target', ['id' => 1, 'slug' => 'slug', 'custom' => 'custom']));
+
+        $this->expectException(RouterException::class);
+        $this->expectExceptionMessage('Route (target): parameter (id) does not accept the value (abc)');
+
+        $this->router->url('target', ['id' => 'abc', 'slug' => 'slug']);
+    }
+
+    public function testUrlMissingParam(): void
+    {
+        $this->router->map('GET', '/target/{id:i}/{slug:s}', 'target', ['name' => 'target']);
+
+        $this->expectException(RouterException::class);
+        $this->expectExceptionMessage('Route (target): parameter (slug) is missing');
+
+        $this->router->url('target', ['id' => 1]);
+    }
+
+    public function testUrlAppendsExtraParamsAsQueryString(): void
+    {
+        $this->router->map('GET', '/target/{id:i}', 'target', ['name' => 'target']);
+        $this->router->map('GET', '/list', 'target', ['name' => 'list']);
+
+        $this->assertSame('/target/1?page=2&q=a%20b%26c', $this->router->url('target', ['id' => 1, 'page' => 2, 'q' => 'a b&c']));
+        $this->assertSame('/list?tags%5B0%5D=x&tags%5B1%5D=y', $this->router->url('list', ['tags' => ['x', 'y']]));
+        $this->assertSame('/list', $this->router->url('list', ['page' => null]));
     }
 
     // -------------------------------------------------------------------------
@@ -474,8 +502,15 @@ final class RouterTest extends TestCase
         $this->router->get('/export.{format:(json|xml)}', 'target', ['name' => 'export']);
 
         $this->assertSame('/export.json', $this->router->url('export', ['format' => 'json']));
-        $this->assertSame('', $this->router->url('export', ['format' => 'jsonx']));
-        $this->assertSame('', $this->router->url('export', ['format' => 'csv']));
+
+        foreach (['jsonx', 'csv'] as $format) {
+            try {
+                $this->router->url('export', ['format' => $format]);
+                $this->fail('Expected a RouterException for ' . $format);
+            } catch (RouterException $e) {
+                $this->assertStringContainsString('(format)', $e->getMessage());
+            }
+        }
     }
 
     public function testUrlInsideAGroup(): void
@@ -492,7 +527,9 @@ final class RouterTest extends TestCase
         $this->router->get('/users', 'target', ['name' => 'users']);
         $this->router->unmap('GET', '/users');
 
-        $this->assertSame('', $this->router->url('users'));
+        $this->expectException(RouterException::class);
+
+        $this->router->url('users');
     }
 
     // -------------------------------------------------------------------------
@@ -522,5 +559,52 @@ final class RouterTest extends TestCase
         });
 
         $this->assertCount(0, $this->router->getRoutes());
+    }
+
+    // -------------------------------------------------------------------------
+    // Base path
+    // -------------------------------------------------------------------------
+
+    public function testBasePathIsNormalized(): void
+    {
+        $this->assertSame('', $this->router->getBasePath());
+        $this->assertSame('/shop', $this->router->setBasePath('shop/')->getBasePath());
+        $this->assertSame('/apps/shop', $this->router->setBasePath('/apps/shop')->getBasePath());
+        $this->assertSame('', $this->router->setBasePath('/')->getBasePath());
+    }
+
+    public function testMatchRemovesTheBasePath(): void
+    {
+        $this->router->setBasePath('/shop');
+        $this->router->get('/', 'home');
+        $this->router->get('/users/{id:i}', 'user');
+
+        $this->assertSame('user', $this->router->match($this->requestGenerator('GET', '/shop/users/42'))->getTarget());
+        $this->assertSame(['id' => '42'], $this->router->match($this->requestGenerator('GET', '/shop/users/42'))->getParams());
+        $this->assertSame('home', $this->router->match($this->requestGenerator('GET', '/shop/'))->getTarget());
+        $this->assertSame('home', $this->router->match($this->requestGenerator('GET', '/shop'))->getTarget());
+    }
+
+    public function testMatchOutsideTheBasePathIsNotFound(): void
+    {
+        $this->router->setBasePath('/shop');
+        $this->router->get('/users', 'users');
+
+        foreach (['/users', '/shopping/users', '/other/users'] as $path) {
+            try {
+                $this->router->match($this->requestGenerator('GET', $path));
+                $this->fail('Expected a NotFoundException for ' . $path);
+            } catch (NotFoundException $e) {
+                $this->assertSame(404, $e->getCode());
+            }
+        }
+    }
+
+    public function testUrlIncludesTheBasePath(): void
+    {
+        $this->router->setBasePath('/shop');
+        $this->router->get('/users/{id:i}', 'user', ['name' => 'user']);
+
+        $this->assertSame('/shop/users/42?tab=posts', $this->router->url('user', ['id' => 42, 'tab' => 'posts']));
     }
 }

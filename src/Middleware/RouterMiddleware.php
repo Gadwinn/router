@@ -2,16 +2,17 @@
 
 declare(strict_types=1);
 
-namespace G\Router\Middlewares;
+namespace G\Router\Middleware;
 
-use G\Router\Exceptions\RouterException;
+use G\Router\Exception\RouterException;
 use G\Router\RouterInterface;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\{MiddlewareInterface, RequestHandlerInterface};
 
 class RouterMiddleware implements MiddlewareInterface
 {
-    protected const string ROUTE_ATTRIBUTE_NAME = 'route';
+    /** Name of the request attribute receiving the matched route */
+    public const string ROUTE_ATTRIBUTE_NAME = 'route';
 
     /**
      * @param RouterInterface $router

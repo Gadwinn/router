@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace G\Router\Routes;
+namespace G\Router\Route;
 
 class Route implements RouteInterface
 {

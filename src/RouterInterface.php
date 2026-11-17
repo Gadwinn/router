@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace G\Router;
 
 use Psr\Http\Message\RequestInterface;
-use G\Router\Routes\RouteInterface;
-use G\Router\Exceptions\{MethodNotAllowedException, NotFoundException, RouterException};
+use G\Router\Route\RouteInterface;
+use G\Router\Exception\{MethodNotAllowedException, NotFoundException, RouterException};
 
 interface RouterInterface
 {
@@ -29,6 +29,25 @@ interface RouterInterface
      * @return static
      */
     public function addAllowedMethod(string $method): static;
+
+    /**
+     * Get the base path
+     *
+     * @return string '' when the application is served at the web root
+     */
+    public function getBasePath(): string;
+
+    /**
+     * Set the base path
+     *
+     * Path the application is served under (e.g. '/shop' or '/apps/shop/public').
+     * It is removed from the request path before matching and prepended to generated URLs.
+     *
+     * @param string $basePath
+     *
+     * @return static
+     */
+    public function setBasePath(string $basePath): static;
 
     /**
      * @return array<string,string> Returns a mapping of pattern aliases to their respective regex patterns.
@@ -75,12 +94,15 @@ interface RouterInterface
     /**
      * Generate a URL
      *
-     * Generates a URL with an optional route name and parameters.
+     * Generates the URL of a named route. Parameters that are not part of the
+     * path are appended as a query string.
      *
      * @param ?string $name
-     * @param array<string,string> $params
+     * @param array<string,mixed> $params
      *
      * @return string
+     *
+     * @throws RouterException When the route is unknown, or a path parameter is missing or invalid
      */
     public function url(?string $name, array $params = []): string;
 
